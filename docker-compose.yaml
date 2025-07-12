@@ -7,8 +7,11 @@ services:
       - POSTGRES_PASSWORD=1234
       - POSTGRES_DB=finance_db
     volumes:
-        - "${PWD}/db-data:/var/lib/postgresql/data"
+        - db-data:/var/lib/postgresql/data
         - "${PWD}/db-scripts/initialize_db_ddl.sql:/docker-entrypoint-initdb.d/initialize_db_ddl.sql"
     ports:
       - "5432:5432"
     command: ["postgres", "-c", "wal_level=logical", "-c", "hot_standby=on"]
+
+volumes:
+  db-data:
