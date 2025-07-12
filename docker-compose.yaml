@@ -1,4 +1,5 @@
 services:
+  # Your existing Postgres database with CDC enabled
   transactions-db:
     build:
       context: ./docker/postgres-db
@@ -7,11 +8,64 @@ services:
       - POSTGRES_PASSWORD=1234
       - POSTGRES_DB=finance_db
     volumes:
-        - db-data:/var/lib/postgresql/data
-        - "${PWD}/db-scripts/initialize_db_ddl.sql:/docker-entrypoint-initdb.d/initialize_db_ddl.sql"
+      - db-data:/var/lib/postgresql/data
+      - "${PWD}/db-scripts/initialize_db_ddl.sql:/docker-entrypoint-initdb.d/initialize_db_ddl.sql"
     ports:
       - "5432:5432"
-    command: ["postgres", "-c", "wal_level=logical", "-c", "hot_standby=on"]
+    command: [ "postgres", "-c", "wal_level=logical", "-c", "hot_standby=on" ]
+    networks:
+      - cdc-net
+
+  # Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - cdc-net
+
+  # Kafka broker
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - cdc-net
+
+  # Kafka Connect with Debezium connector
+  connect:
+    image: debezium/connect:2.6
+    depends_on:
+      - kafka
+      - transactions-db
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      # ⚠️ DO NOT add CONNECT_PLUGIN_PATH here — it's built-in already
+    networks:
+      - cdc-net
 
 volumes:
   db-data:
+
+networks:
+  cdc-net:
+    driver: bridge
