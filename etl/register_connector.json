@@ -1,0 +1,20 @@
+{
+  "name": "pg-cdc-transactions",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "transactions-db",
+    "database.port": "5432",
+    "database.user": "cdc_user",
+    "database.password": "cdc_1234",
+    "database.dbname": "finance_db",
+    "topic.prefix": "finance_db",
+    "database.server.name": "finance_db",
+    "table.include.list": "operations.orders",
+    "plugin.name": "pgoutput",
+    "slot.name": "cdc_pgoutput",
+    "publication.name": "cdc_publication",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter"
+  }
+}
+
