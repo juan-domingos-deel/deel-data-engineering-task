@@ -16,6 +16,19 @@ services:
     networks:
       - cdc-net
 
+  spark:
+    build:
+      context: .
+      dockerfile: docker/spark/Dockerfile
+    depends_on:
+      - transactions-db
+    environment:
+      PYSPARK_PYTHON: /opt/bitnami/python/bin/python
+    command: >
+      spark-submit
+      --jars /app/postgresql-42.7.3.jar
+      /app/spark-job.py
+
   # Zookeeper (required for Kafka)
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0

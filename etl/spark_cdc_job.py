@@ -38,7 +38,7 @@ payload_schema = StructType([
 # Read Kafka CDC stream
 kafka_df = spark.readStream \
     .format("kafka") \
-    .option("kafka.bootstrap.servers", "localhost:29092") \
+    .option("kafka.bootstrap.servers", "transactions-db:29092") \
     .option("subscribe", "finance_db.operations.orders") \
     .option("startingOffsets", "latest") \
     .load()
