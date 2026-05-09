@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: deel
+    orgId: 1
+    folder: Deel
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

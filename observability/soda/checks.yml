@@ -1,0 +1,34 @@
+checks for dim_customer:
+  - row_count > 0
+  - duplicate_count(customer_id) = 0:
+      filter: is_current = true
+      name: "exactly one current SCD2 row per customer_id"
+  - missing_count(customer_sk) = 0
+  - missing_count(valid_from) = 0
+
+checks for dim_product:
+  - row_count > 0
+  - duplicate_count(product_id) = 0:
+      filter: is_current = true
+      name: "exactly one current SCD2 row per product_id"
+
+checks for fact_orders:
+  - missing_count(customer_sk) = 0
+  - failed rows:
+      name: "every fact_orders.customer_sk exists in dim_customer"
+      fail query: |
+        SELECT f.order_id
+        FROM marts.fact_orders f
+        LEFT JOIN marts.dim_customer c ON c.customer_sk = f.customer_sk
+        WHERE c.customer_sk IS NULL
+
+checks for fact_order_items:
+  - failed rows:
+      name: "denormalization invariant: items.current_order_status = orders.current_status"
+      fail query: |
+        SELECT i.order_item_id, i.current_order_status, f.current_status
+        FROM marts.fact_order_items i
+        JOIN marts.fact_orders f ON f.order_id = i.order_id
+        WHERE i.is_deleted = false
+          AND f.is_deleted = false
+          AND i.current_order_status IS DISTINCT FROM f.current_status

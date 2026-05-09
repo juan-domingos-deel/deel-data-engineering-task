@@ -1,0 +1,8 @@
+data_source analytics:
+  type: postgres
+  host: postgres-analytics
+  port: 5432
+  database: analytics_db
+  username: analytics_user
+  password: analytics_pw
+  schema: marts

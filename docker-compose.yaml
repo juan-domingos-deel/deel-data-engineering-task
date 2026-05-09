@@ -1,5 +1,6 @@
 services:
   transactions-db:
+    container_name: transactions-db
     build:
       context: ./docker/postgres-db
     environment:
@@ -12,6 +13,30 @@ services:
     ports:
       - "5432:5432"
     command: ["postgres", "-c", "wal_level=logical", "-c", "hot_standby=on"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_db_user -d finance_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres-analytics:
+    container_name: postgres-analytics
+    build:
+      context: ./docker/postgres-analytics
+    environment:
+      - POSTGRES_USER=analytics_user
+      - POSTGRES_PASSWORD=analytics_pw
+      - POSTGRES_DB=analytics_db
+    volumes:
+      - pg-analytics-data:/var/lib/postgresql/data
+      - "${PWD}/db-scripts/analytics:/docker-entrypoint-initdb.d"
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytics_user -d analytics_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -64,5 +89,116 @@ services:
     entrypoint: ["/bin/sh", "/init-connectors.sh"]
     restart: "no"
 
+  consumer:
+    container_name: consumer
+    build:
+      context: ./consumer
+    depends_on:
+      kafka:
+        condition: service_started
+      kafka-connect:
+        condition: service_started
+      postgres-analytics:
+        condition: service_healthy
+    environment:
+      CONSUMER_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CONSUMER_PG_HOST: postgres-analytics
+      CONSUMER_PG_PORT: 5432
+      CONSUMER_PG_DB: analytics_db
+      CONSUMER_PG_USER: analytics_user
+      CONSUMER_PG_PASSWORD: analytics_pw
+      CONSUMER_LOG_LEVEL: INFO
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  api:
+    container_name: api
+    build:
+      context: ./api
+    depends_on:
+      postgres-analytics:
+        condition: service_healthy
+    environment:
+      API_PG_HOST: postgres-analytics
+      API_PG_PORT: 5432
+      API_PG_DB: analytics_db
+      API_PG_USER: analytics_user
+      API_PG_PASSWORD: analytics_pw
+      API_LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # ----- Observability (full stack default; remove via docker-compose.lite.yml) -----
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    depends_on:
+      - api
+      - consumer
+    volumes:
+      - "${PWD}/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - "${PWD}/observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+      - "${PWD}/observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+    ports:
+      - "3000:3000"
+
+  postgres-source-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    depends_on:
+      transactions-db:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: "postgresql://finance_db_user:1234@transactions-db:5432/finance_db?sslmode=disable"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/pg-exporter/queries.yaml
+    volumes:
+      - "${PWD}/observability/postgres-exporter/queries.yaml:/etc/pg-exporter/queries.yaml:ro"
+    ports:
+      - "9187:9187"
+
+  postgres-analytics-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    depends_on:
+      postgres-analytics:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: "postgresql://analytics_user:analytics_pw@postgres-analytics:5432/analytics_db?sslmode=disable"
+    ports:
+      - "9188:9187"
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    depends_on:
+      - kafka
+    command: ["--kafka.server=kafka:29092"]
+    ports:
+      - "9308:9308"
+
+  soda-runner:
+    container_name: soda-runner
+    build:
+      context: ./observability/soda
+    depends_on:
+      postgres-analytics:
+        condition: service_healthy
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+
 volumes:
   pg-data:
+  pg-analytics-data:

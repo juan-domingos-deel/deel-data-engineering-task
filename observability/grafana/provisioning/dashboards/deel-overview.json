@@ -1,0 +1,98 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Freshness - now − source_commit_ts",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "freshness_seconds", "refId": "A"}
+      ],
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+      "options": {
+        "graphMode": "area",
+        "colorMode": "value",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 2},
+              {"color": "red", "value": 5}
+            ]
+          },
+          "unit": "s",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Replication slot WAL lag (bytes)",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "pg_replication_slots_lag_bytes{slot_name=\"cdc_pgoutput\"}", "refId": "A"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+    },
+    {
+      "type": "timeseries",
+      "title": "Consumer apply duration (p95)",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(apply_batch_duration_seconds_bucket[5m])))",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "type": "timeseries",
+      "title": "API request rate by status",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(http_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    },
+    {
+      "type": "timeseries",
+      "title": "Soda DQ checks: passed vs failed",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr": "sum(rate(soda_check_passed_total[5m]))", "refId": "A", "legendFormat": "passed"},
+        {"expr": "sum(rate(soda_check_failed_total[5m]))", "refId": "B", "legendFormat": "failed"}
+      ],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["deel"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Deel Streaming Overview",
+  "uid": "deel-overview",
+  "version": 1
+}

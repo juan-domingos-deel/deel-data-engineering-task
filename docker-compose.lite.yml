@@ -1,0 +1,22 @@
+# Lite override: drops the observability bundle (Prometheus, Grafana,
+# postgres exporters, kafka exporter, soda runner) for resource-constrained
+# reviewer machines. Run with:
+#
+#   docker-compose -f docker-compose.yaml -f docker-compose.lite.yml up
+#
+# The "scale: 0" trick disables a service without removing the YAML block,
+# which is the cleanest way to subtract from a base compose file.
+
+services:
+  prometheus:
+    profiles: ["disabled"]
+  grafana:
+    profiles: ["disabled"]
+  postgres-source-exporter:
+    profiles: ["disabled"]
+  postgres-analytics-exporter:
+    profiles: ["disabled"]
+  kafka-exporter:
+    profiles: ["disabled"]
+  soda-runner:
+    profiles: ["disabled"]
